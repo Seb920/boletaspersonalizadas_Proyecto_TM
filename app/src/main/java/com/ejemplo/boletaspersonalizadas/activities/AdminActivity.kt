@@ -6,13 +6,15 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.bumptech.glide.Glide
+import com.ejemplo.boletaspersonalizadas.R
 import com.ejemplo.boletaspersonalizadas.databinding.ActivityAdminBinding
 import com.ejemplo.boletaspersonalizadas.models.Producto
 import com.ejemplo.boletaspersonalizadas.repositories.FirebaseRepository
 import com.ejemplo.boletaspersonalizadas.utils.PreferenciasManager
+import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
-import com.bumptech.glide.Glide
 
 class AdminActivity : AppCompatActivity() {
 
@@ -53,7 +55,6 @@ class AdminActivity : AppCompatActivity() {
             binding.tabConfiguracion.visibility = android.view.View.VISIBLE
         }
 
-        // Configurar botones de productos
         binding.btnAgregarProducto.setOnClickListener {
             mostrarDialogoProducto(null)
         }
@@ -68,12 +69,10 @@ class AdminActivity : AppCompatActivity() {
     }
 
     private fun mostrarDialogoProducto(producto: Producto?) {
-        val builder = AlertDialog.Builder(this)
-        val view = layoutInflater.inflate(com.ejemplo.boletaspersonalizadas.R.layout.dialog_producto, null)
-
-        val etCodigo = view.findViewById<com.google.android.material.textfield.TextInputEditText>(com.ejemplo.boletaspersonalizadas.R.id.etCodigo)
-        val etNombre = view.findViewById<com.google.android.material.textfield.TextInputEditText>(com.ejemplo.boletaspersonalizadas.R.id.etNombre)
-        val etPrecio = view.findViewById<com.google.android.material.textfield.TextInputEditText>(com.ejemplo.boletaspersonalizadas.R.id.etPrecio)
+        val view = layoutInflater.inflate(R.layout.dialog_producto, null)
+        val etCodigo = view.findViewById<TextInputEditText>(R.id.etCodigo)
+        val etNombre = view.findViewById<TextInputEditText>(R.id.etNombre)
+        val etPrecio = view.findViewById<TextInputEditText>(R.id.etPrecio)
 
         if (producto != null) {
             etCodigo.setText(producto.codigo)
@@ -81,38 +80,52 @@ class AdminActivity : AppCompatActivity() {
             etPrecio.setText(producto.precioUnitario.toString())
         }
 
-        builder.setTitle(if (producto == null) "Agregar Producto" else "Editar Producto")
-        builder.setView(view)
-        builder.setPositiveButton("Guardar") { _, _ ->
-            val nuevoProducto = Producto(
-                id = producto?.id ?: "",
-                codigo = etCodigo.text.toString(),
-                nombre = etNombre.text.toString(),
-                precioUnitario = etPrecio.text.toString().toDoubleOrNull() ?: 0.0
-            )
+        AlertDialog.Builder(this)
+            .setTitle(if (producto == null) "Agregar Producto" else "Editar Producto")
+            .setView(view)
+            .setPositiveButton("Guardar") { _, _ ->
+                val codigo = etCodigo.text.toString()
+                val nombre = etNombre.text.toString()
+                val precio = etPrecio.text.toString().toDoubleOrNull() ?: 0.0
 
-            if (producto == null) {
-                firebaseRepo.agregarProducto(nuevoProducto) {
-                    cargarProductos()
-                    Toast.makeText(this, "Producto agregado", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                firebaseRepo.actualizarProducto(nuevoProducto) {
-                    cargarProductos()
-                    Toast.makeText(this, "Producto actualizado", Toast.LENGTH_SHORT).show()
+                if (codigo.isNotEmpty() && nombre.isNotEmpty() && precio > 0) {
+                    val nuevoProducto = Producto(
+                        id = producto?.id ?: "",
+                        codigo = codigo,
+                        nombre = nombre,
+                        precioUnitario = precio,
+                        activo = true
+                    )
+
+                    if (producto == null) {
+                        firebaseRepo.agregarProducto(nuevoProducto) {
+                            Toast.makeText(this, "Producto agregado", Toast.LENGTH_SHORT).show()
+                            cargarProductos()
+                        }
+                    } else {
+                        firebaseRepo.actualizarProducto(nuevoProducto) {
+                            Toast.makeText(this, "Producto actualizado", Toast.LENGTH_SHORT).show()
+                            cargarProductos()
+                        }
+                    }
+                } else {
+                    Toast.makeText(this, "Complete todos los campos", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
-        builder.setNegativeButton("Cancelar", null)
-        builder.show()
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun cargarProductos() {
         firebaseRepo.obtenerProductos { productos ->
-            val texto = productos.joinToString("\n") {
-                "${it.codigo} - ${it.nombre} - S/ ${it.precioUnitario}"
+            val texto = if (productos.isEmpty()) {
+                "No hay productos. Presiona + para agregar"
+            } else {
+                productos.joinToString("\n") {
+                    "${it.codigo} - ${it.nombre} - S/ ${String.format("%.2f", it.precioUnitario)}"
+                }
             }
-            binding.tvListaProductos.text = if (productos.isEmpty()) "No hay productos" else texto
+            binding.tvListaProductos.text = texto
         }
     }
 
@@ -146,6 +159,8 @@ class AdminActivity : AppCompatActivity() {
         firebaseRepo.obtenerConfiguracion { config ->
             if (config != null) {
                 binding.etNombreNegocio.setText(config.nombreNegocio)
+                binding.etRuc.setText(config.ruc)
+                binding.etDireccion.setText(config.direccion)
                 binding.etLinkQr.setText(config.linkQrNegocio)
                 binding.etPorcentajeIgv.setText(config.porcentajeIGV.toString())
 
@@ -158,11 +173,17 @@ class AdminActivity : AppCompatActivity() {
 
     private fun guardarConfiguracion() {
         val nombre = binding.etNombreNegocio.text.toString()
+        val ruc = binding.etRuc.text.toString()
+        val direccion = binding.etDireccion.text.toString()
         val linkQr = binding.etLinkQr.text.toString()
         val igv = binding.etPorcentajeIgv.text.toString().toDoubleOrNull() ?: 18.0
 
-        firebaseRepo.guardarConfiguracion(nombre, linkQr, igv) {
-            Toast.makeText(this, "Configuración guardada", Toast.LENGTH_SHORT).show()
+        if (nombre.isNotEmpty()) {
+            firebaseRepo.guardarConfiguracionCompleta(nombre, ruc, direccion, linkQr, igv) {
+                Toast.makeText(this, "Configuración guardada", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "El nombre del negocio es requerido", Toast.LENGTH_SHORT).show()
         }
     }
 }

@@ -120,4 +120,24 @@ class FirebaseRepository {
                 callback(emptyList())
             }
     }
+    fun guardarConfiguracionCompleta(
+        nombre: String,
+        ruc: String,
+        direccion: String,
+        linkQr: String,
+        igv: Double,
+        callback: () -> Unit
+    ) {
+        val config = ConfiguracionNegocio(
+            nombreNegocio = nombre,
+            ruc = ruc,
+            direccion = direccion,
+            linkQrNegocio = linkQr,
+            porcentajeIGV = igv,
+            logoUrl = "" // Se mantiene el logo existente
+        )
+        database.child("configuracion").child("negocio").setValue(config)
+            .addOnSuccessListener { callback() }
+            .addOnFailureListener { it.printStackTrace() }
+    }
 }
