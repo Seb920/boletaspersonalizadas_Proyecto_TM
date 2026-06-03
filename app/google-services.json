@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "899987172609",
+    "firebase_url": "https://boletaspersonalizadas-b1ed4-default-rtdb.firebaseio.com",
+    "project_id": "boletaspersonalizadas-b1ed4",
+    "storage_bucket": "boletaspersonalizadas-b1ed4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:899987172609:android:27157f76da51b8ca547f00",
+        "android_client_info": {
+          "package_name": "com.ejemplo.boletaspersonalizadas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnIg0wkWzMb9CeUs8zShg3rgx5PCooX94"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
