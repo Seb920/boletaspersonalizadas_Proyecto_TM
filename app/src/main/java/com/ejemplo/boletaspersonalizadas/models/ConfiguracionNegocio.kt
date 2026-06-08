@@ -7,5 +7,5 @@ data class ConfiguracionNegocio(
     val direccion: String = "",
     val logoUrl: String = "",
     val porcentajeIGV: Double = 18.0,
-    val linkQrNegocio: String = "https://mipagina.com"
+    val linkQrNegocio: String = ""
 )

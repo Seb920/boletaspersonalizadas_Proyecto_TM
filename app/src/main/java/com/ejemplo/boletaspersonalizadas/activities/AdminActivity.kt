@@ -35,6 +35,7 @@ class AdminActivity : AppCompatActivity() {
         configurarTabs()
         cargarConfiguracion()
         cargarProductos()
+        cargarNotificaciones()  // Llamar a la función de notificaciones
 
         binding.btnCerrarSesion.setOnClickListener {
             FirebaseAuth.getInstance().signOut()
@@ -185,5 +186,29 @@ class AdminActivity : AppCompatActivity() {
         } else {
             Toast.makeText(this, "El nombre del negocio es requerido", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    // ==================== FUNCIONES DE NOTIFICACIONES ====================
+
+    private fun cargarNotificaciones() {
+        firebaseRepo.obtenerNotificaciones { notificaciones ->
+            if (notificaciones.isNotEmpty()) {
+                // Mostrar solo la última notificación
+                val ultima = notificaciones.first()
+                val titulo = ultima["titulo"] as? String ?: ""
+                val mensaje = ultima["mensaje"] as? String ?: ""
+                mostrarNotificacionEnApp(titulo, mensaje)
+            }
+        }
+    }
+
+    private fun mostrarNotificacionEnApp(titulo: String, mensaje: String) {
+        AlertDialog.Builder(this)
+            .setTitle(titulo)
+            .setMessage(mensaje)
+            .setPositiveButton("OK") { _, _ ->
+                // Aquí puedes agregar acción al hacer clic
+            }
+            .show()
     }
 }

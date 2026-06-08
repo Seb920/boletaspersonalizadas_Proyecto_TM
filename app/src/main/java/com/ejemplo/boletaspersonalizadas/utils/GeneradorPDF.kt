@@ -2,9 +2,10 @@ package com.ejemplo.boletaspersonalizadas.utils
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Environment
+import android.util.Log
 import android.widget.Toast
-import com.bumptech.glide.Glide
 import com.ejemplo.boletaspersonalizadas.models.Boleta
 import com.ejemplo.boletaspersonalizadas.models.ConfiguracionNegocio
 import com.google.zxing.BarcodeFormat
@@ -22,6 +23,7 @@ import com.itextpdf.layout.element.Table
 import com.itextpdf.layout.properties.TextAlignment
 import com.itextpdf.layout.properties.UnitValue
 import java.io.File
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -47,27 +49,29 @@ class GeneradorPDF {
                 document.setMargins(50f, 50f, 50f, 50f)
 
                 // === LOGO ===
+                Log.d("PDF", "URL del logo: ${config.logoUrl}")
+
                 if (config.logoUrl.isNotEmpty()) {
                     try {
-                        val bitmap = Glide.with(context)
-                            .asBitmap()
-                            .load(config.logoUrl)
-                            .submit()
-                            .get()
-
-                        val stream = java.io.ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-                        val data = stream.toByteArray()
-                        val imgData = com.itextpdf.io.image.ImageDataFactory.create(data)
-                        val image = Image(imgData).setWidth(80f).setHeight(80f)
-                        image.setTextAlignment(TextAlignment.CENTER)
-                        document.add(image)
+                        val bitmap = cargarImagenDesdeUrl(config.logoUrl)
+                        if (bitmap != null) {
+                            val stream = java.io.ByteArrayOutputStream()
+                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                            val data = stream.toByteArray()
+                            val imgData = com.itextpdf.io.image.ImageDataFactory.create(data)
+                            val image = Image(imgData).setWidth(80f).setHeight(80f)
+                            image.setTextAlignment(TextAlignment.CENTER)
+                            document.add(image)
+                            Log.d("PDF", "Logo cargado exitosamente")
+                        } else {
+                            Log.e("PDF", "No se pudo cargar el bitmap")
+                        }
                     } catch (e: Exception) {
-                        // Continuar sin logo
+                        Log.e("PDF", "Error al cargar logo: ${e.message}")
                     }
                 }
 
-                // === NOMBRE DE LA EMPRESA ===
+                // === NOMBRE EMPRESA ===
                 document.add(Paragraph(config.nombreNegocio)
                     .setTextAlignment(TextAlignment.CENTER)
                     .setFontSize(20f)
@@ -83,7 +87,7 @@ class GeneradorPDF {
 
                 document.add(Paragraph(" "))
 
-                // === TÍTULO BOLETA ===
+                // === TÍTULO ===
                 document.add(Paragraph("BOLETA DE VENTA ELECTRÓNICA")
                     .setTextAlignment(TextAlignment.CENTER)
                     .setFontSize(14f)
@@ -101,7 +105,7 @@ class GeneradorPDF {
 
                 document.add(Paragraph(" "))
 
-                // === DATOS DEL CLIENTE ===
+                // === DATOS CLIENTE ===
                 document.add(Paragraph("DATOS DEL CLIENTE")
                     .setFontSize(12f)
                     .setBold())
@@ -109,11 +113,10 @@ class GeneradorPDF {
                 document.add(Paragraph("Documento: ${boleta.clienteDocumento}"))
                 document.add(Paragraph(" "))
 
-                // === TABLA DE PRODUCTOS ===
+                // === TABLA PRODUCTOS ===
                 val tabla = Table(UnitValue.createPercentArray(floatArrayOf(10f, 45f, 15f, 15f, 15f)))
                 tabla.setWidth(UnitValue.createPercentValue(100f))
 
-                // Encabezados
                 val headerCell = Cell().setBackgroundColor(ColorConstants.LIGHT_GRAY).setBold()
                 tabla.addCell(headerCell.clone(true).add(Paragraph("Cant")))
                 tabla.addCell(headerCell.clone(true).add(Paragraph("Producto")))
@@ -121,12 +124,11 @@ class GeneradorPDF {
                 tabla.addCell(headerCell.clone(true).add(Paragraph("Total")))
                 tabla.addCell(headerCell.clone(true).add(Paragraph("Código")))
 
-                // Datos
                 for (item in boleta.productos) {
                     tabla.addCell(Cell().add(Paragraph(item.cantidad.toString())))
                     tabla.addCell(Cell().add(Paragraph(item.nombre)))
                     tabla.addCell(Cell().add(Paragraph("S/ ${String.format("%.2f", item.precioUnitario)}")))
-                    tabla.addCell(Cell().add(Paragraph("S/ ${String.format("%.2f", item.total)}")))
+                    tabla.addCell(Cell().add(Paragraph("S/ ${String.format("%.2f}", item.total)}")))
                     tabla.addCell(Cell().add(Paragraph(item.codigo)))
                 }
 
@@ -146,7 +148,7 @@ class GeneradorPDF {
                 document.add(Paragraph(" "))
                 document.add(Paragraph(" "))
 
-                // === QR CENTRADO (EN EL MEDIO) ===
+                // === QR CENTRADO ===
                 try {
                     val qrText = if (config.linkQrNegocio.isNotEmpty()) {
                         config.linkQrNegocio
@@ -162,7 +164,6 @@ class GeneradorPDF {
                         val imgData = com.itextpdf.io.image.ImageDataFactory.create(data)
                         val qrImage = Image(imgData).setWidth(120f).setHeight(120f)
 
-                        // Crear un párrafo centrado para el QR
                         val qrParagraph = Paragraph()
                             .setTextAlignment(TextAlignment.CENTER)
                             .add(qrImage)
@@ -172,30 +173,19 @@ class GeneradorPDF {
                             .setTextAlignment(TextAlignment.CENTER)
                             .setFontSize(9f)
                             .setFontColor(ColorConstants.BLUE))
-                    } else {
-                        document.add(Paragraph("Link: ${config.linkQrNegocio}")
-                            .setTextAlignment(TextAlignment.CENTER)
-                            .setFontSize(9f))
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
-                    document.add(Paragraph("Link: ${config.linkQrNegocio}")
-                        .setTextAlignment(TextAlignment.CENTER)
-                        .setFontSize(9f))
+                    Log.e("PDF", "Error al generar QR: ${e.message}")
                 }
 
                 document.add(Paragraph(" "))
                 document.add(Paragraph(" "))
 
-                // === PIE DE PÁGINA ===
+                // === PIE ===
                 document.add(Paragraph("Gracias por su compra")
                     .setTextAlignment(TextAlignment.CENTER)
                     .setFontSize(11f)
                     .setBold())
-
-                document.add(Paragraph(" ")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(8f))
 
                 document.add(Paragraph("Este documento es una representación impresa de la Boleta Electrónica")
                     .setTextAlignment(TextAlignment.CENTER)
@@ -208,9 +198,25 @@ class GeneradorPDF {
                 return archivo.absolutePath
 
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("PDF", "Error general: ${e.message}")
                 Toast.makeText(context, "Error al generar PDF: ${e.message}", Toast.LENGTH_SHORT).show()
                 return null
+            }
+        }
+
+        private fun cargarImagenDesdeUrl(url: String): Bitmap? {
+            return try {
+                if (url.startsWith("http")) {
+                    val conexion = URL(url).openConnection()
+                    conexion.connect()
+                    val inputStream = conexion.getInputStream()
+                    BitmapFactory.decodeStream(inputStream)
+                } else {
+                    BitmapFactory.decodeFile(url)
+                }
+            } catch (e: Exception) {
+                Log.e("PDF", "Error cargando imagen: ${e.message}")
+                null
             }
         }
 
@@ -225,7 +231,7 @@ class GeneradorPDF {
                 }
                 bmp
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("PDF", "Error generando QR: ${e.message}")
                 null
             }
         }

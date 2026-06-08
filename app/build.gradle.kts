@@ -48,12 +48,14 @@ dependencies {
     implementation("com.google.android.material:material:1.8.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
-    // Firebase - REALTIME DATABASE (GRATIS)
+    // Firebase
     implementation("com.google.firebase:firebase-auth:22.3.1")
-    implementation("com.google.firebase:firebase-database:20.3.0")  // ← Realtime Database
+    implementation("com.google.firebase:firebase-database:20.3.0")
     implementation("com.google.firebase:firebase-storage:20.3.0")
+    implementation("com.google.firebase:firebase-messaging:23.3.1")  // FCM
 
     // QR Code
+    implementation("com.google.zxing:core:3.5.2")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     // PDF Generation
@@ -61,6 +63,9 @@ dependencies {
 
     // Image Loading
     implementation("com.github.bumptech.glide:glide:4.15.1")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

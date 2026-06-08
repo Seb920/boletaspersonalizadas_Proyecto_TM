@@ -1,7 +1,8 @@
 package com.ejemplo.boletaspersonalizadas.repositories
 
+import android.util.Log
 import com.ejemplo.boletaspersonalizadas.models.*
-import com.google.firebase.database.*
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.storage.FirebaseStorage
 
 class FirebaseRepository {
@@ -9,11 +10,11 @@ class FirebaseRepository {
     private val database = FirebaseDatabase.getInstance().reference
     private val storage = FirebaseStorage.getInstance()
 
-    // USUARIOS
+    // ==================== USUARIOS ====================
     fun guardarUsuario(usuario: Usuario, callback: () -> Unit) {
         database.child("usuarios").child(usuario.id).setValue(usuario)
             .addOnSuccessListener { callback() }
-            .addOnFailureListener { it.printStackTrace() }
+            .addOnFailureListener { Log.e("Firebase", "Error guardar usuario", it) }
     }
 
     fun obtenerUsuario(userId: String, callback: (Usuario?) -> Unit) {
@@ -23,24 +24,24 @@ class FirebaseRepository {
                 callback(usuario)
             }
             .addOnFailureListener {
-                it.printStackTrace()
+                Log.e("Firebase", "Error obtener usuario", it)
                 callback(null)
             }
     }
 
-    // PRODUCTOS
+    // ==================== PRODUCTOS ====================
     fun agregarProducto(producto: Producto, callback: () -> Unit) {
         val key = database.child("productos").push().key ?: return
         val nuevoProducto = producto.copy(id = key)
         database.child("productos").child(key).setValue(nuevoProducto)
             .addOnSuccessListener { callback() }
-            .addOnFailureListener { it.printStackTrace() }
+            .addOnFailureListener { Log.e("Firebase", "Error agregar producto", it) }
     }
 
     fun actualizarProducto(producto: Producto, callback: () -> Unit) {
         database.child("productos").child(producto.id).setValue(producto)
             .addOnSuccessListener { callback() }
-            .addOnFailureListener { it.printStackTrace() }
+            .addOnFailureListener { Log.e("Firebase", "Error actualizar producto", it) }
     }
 
     fun obtenerProductos(callback: (List<Producto>) -> Unit) {
@@ -56,27 +57,36 @@ class FirebaseRepository {
                 callback(productos)
             }
             .addOnFailureListener {
-                it.printStackTrace()
+                Log.e("Firebase", "Error obtener productos", it)
                 callback(emptyList())
             }
     }
 
-    // CONFIGURACIÓN
-    fun guardarConfiguracion(nombre: String, linkQr: String, igv: Double, callback: () -> Unit) {
+    // ==================== CONFIGURACIÓN ====================
+    fun guardarConfiguracionCompleta(
+        nombre: String,
+        ruc: String,
+        direccion: String,
+        linkQr: String,
+        igv: Double,
+        callback: () -> Unit
+    ) {
         val config = ConfiguracionNegocio(
             nombreNegocio = nombre,
+            ruc = ruc,
+            direccion = direccion,
             linkQrNegocio = linkQr,
             porcentajeIGV = igv
         )
         database.child("configuracion").child("negocio").setValue(config)
             .addOnSuccessListener { callback() }
-            .addOnFailureListener { it.printStackTrace() }
+            .addOnFailureListener { Log.e("Firebase", "Error guardar configuración", it) }
     }
 
     fun actualizarLogoUrl(url: String, callback: () -> Unit) {
         database.child("configuracion").child("negocio").child("logoUrl").setValue(url)
             .addOnSuccessListener { callback() }
-            .addOnFailureListener { it.printStackTrace() }
+            .addOnFailureListener { Log.e("Firebase", "Error actualizar logo", it) }
     }
 
     fun obtenerConfiguracion(callback: (ConfiguracionNegocio?) -> Unit) {
@@ -86,20 +96,57 @@ class FirebaseRepository {
                 callback(config)
             }
             .addOnFailureListener {
-                it.printStackTrace()
+                Log.e("Firebase", "Error obtener configuración", it)
                 callback(null)
             }
     }
 
-    // BOLETAS
+    // ==================== BOLETAS ====================
     fun guardarBoleta(boleta: Boleta, callback: (String) -> Unit) {
         val key = database.child("boletas").push().key ?: return
         val nuevaBoleta = boleta.copy(id = key)
         database.child("boletas").child(key).setValue(nuevaBoleta)
-            .addOnSuccessListener { callback(key) }
+            .addOnSuccessListener {
+                callback(key)
+                // Guardar notificación automática
+                guardarNotificacionNuevaBoleta(nuevaBoleta)
+            }
             .addOnFailureListener {
-                it.printStackTrace()
+                Log.e("Firebase", "Error guardar boleta", it)
                 callback("")
+            }
+    }
+
+    private fun guardarNotificacionNuevaBoleta(boleta: Boleta) {
+        val notificacion = mapOf(
+            "titulo" to "Nueva Boleta",
+            "mensaje" to "Boleta ${boleta.numeroSerie} - Total: S/ ${String.format("%.2f", boleta.total)}",
+            "fecha" to System.currentTimeMillis(),
+            "boletaId" to boleta.id,
+            "cliente" to boleta.clienteNombre
+        )
+        database.child("notificaciones").push().setValue(notificacion)
+            .addOnFailureListener { Log.e("Firebase", "Error guardar notificación", it) }
+    }
+
+    fun obtenerNotificaciones(callback: (List<Map<String, Any>>) -> Unit) {
+        database.child("notificaciones")
+            .orderByChild("fecha")
+            .limitToLast(20)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val notificaciones = mutableListOf<Map<String, Any>>()
+                for (child in snapshot.children) {
+                    val noti = child.value as? Map<String, Any>
+                    if (noti != null) {
+                        notificaciones.add(noti)
+                    }
+                }
+                callback(notificaciones.reversed())
+            }
+            .addOnFailureListener {
+                Log.e("Firebase", "Error obtener notificaciones", it)
+                callback(emptyList())
             }
     }
 
@@ -116,28 +163,8 @@ class FirebaseRepository {
                 callback(boletas.sortedByDescending { it.fecha })
             }
             .addOnFailureListener {
-                it.printStackTrace()
+                Log.e("Firebase", "Error obtener boletas", it)
                 callback(emptyList())
             }
-    }
-    fun guardarConfiguracionCompleta(
-        nombre: String,
-        ruc: String,
-        direccion: String,
-        linkQr: String,
-        igv: Double,
-        callback: () -> Unit
-    ) {
-        val config = ConfiguracionNegocio(
-            nombreNegocio = nombre,
-            ruc = ruc,
-            direccion = direccion,
-            linkQrNegocio = linkQr,
-            porcentajeIGV = igv,
-            logoUrl = "" // Se mantiene el logo existente
-        )
-        database.child("configuracion").child("negocio").setValue(config)
-            .addOnSuccessListener { callback() }
-            .addOnFailureListener { it.printStackTrace() }
     }
 }

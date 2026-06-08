@@ -11,6 +11,7 @@ import com.ejemplo.boletaspersonalizadas.adapters.ProductoAdapter
 import com.ejemplo.boletaspersonalizadas.databinding.ActivityEmpleadoBinding
 import com.ejemplo.boletaspersonalizadas.models.ItemBoleta
 import com.ejemplo.boletaspersonalizadas.models.Producto
+import com.ejemplo.boletaspersonalizadas.models.Boleta
 import com.ejemplo.boletaspersonalizadas.repositories.FirebaseRepository
 import com.ejemplo.boletaspersonalizadas.utils.PreferenciasManager
 import com.ejemplo.boletaspersonalizadas.utils.GeneradorPDF
@@ -24,8 +25,6 @@ class EmpleadoActivity : AppCompatActivity() {
     private lateinit var preferencias: PreferenciasManager
     private lateinit var adapter: ProductoAdapter
     private val carrito = mutableListOf<ItemBoleta>()
-
-    // Contador para número de boleta (se guarda en SharedPreferences)
     private var numeroBoletaCorrelativo = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,9 +35,7 @@ class EmpleadoActivity : AppCompatActivity() {
         firebaseRepo = FirebaseRepository()
         preferencias = PreferenciasManager(this)
 
-        // Cargar el último número de boleta usado
         cargarUltimoNumeroBoleta()
-
         configurarRecyclerView()
         cargarProductos()
 
@@ -85,9 +82,7 @@ class EmpleadoActivity : AppCompatActivity() {
 
     private fun generarNumeroBoleta(): String {
         val numeroActual = numeroBoletaCorrelativo
-        // Formato: B000001, B000002, B000003, etc.
-        val numeroFormateado = String.format("B%06d", numeroActual)
-        return numeroFormateado
+        return String.format("B%06d", numeroActual)
     }
 
     private fun configurarRecyclerView() {
@@ -101,7 +96,7 @@ class EmpleadoActivity : AppCompatActivity() {
     private fun cargarProductos() {
         firebaseRepo.obtenerProductos { productos ->
             if (productos.isEmpty()) {
-                Toast.makeText(this, "No hay productos disponibles. Contacta al administrador.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "No hay productos disponibles", Toast.LENGTH_LONG).show()
             }
             adapter.actualizarLista(productos)
         }
@@ -132,8 +127,6 @@ class EmpleadoActivity : AppCompatActivity() {
                 val cantidad = input.text.toString().toIntOrNull() ?: 1
                 if (cantidad > 0) {
                     agregarAlCarrito(producto, cantidad)
-                } else {
-                    Toast.makeText(this, "Cantidad inválida", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -207,11 +200,9 @@ class EmpleadoActivity : AppCompatActivity() {
             val subtotal = carrito.sumOf { it.total }
             val igv = subtotal * (config.porcentajeIGV / 100)
             val total = subtotal + igv
-
-            // Generar número de boleta correlativo
             val numeroSerie = generarNumeroBoleta()
 
-            val boleta = com.ejemplo.boletaspersonalizadas.models.Boleta(
+            val boleta = Boleta(
                 numeroSerie = numeroSerie,
                 productos = carrito.toList(),
                 subtotal = subtotal,
@@ -225,17 +216,15 @@ class EmpleadoActivity : AppCompatActivity() {
             )
 
             firebaseRepo.guardarBoleta(boleta) { boletaId ->
-                // Reemplazar la llamada a GeneradorPDF:
                 val pdfPath = GeneradorPDF.generarBoletaPDF(
                     this, boleta, config
                 )
 
                 if (pdfPath != null) {
-                    // Incrementar y guardar el número para la próxima boleta
                     guardarUltimoNumeroBoleta()
                     numeroBoletaCorrelativo++
 
-                    Toast.makeText(this, "✅ Boleta $numeroSerie generada exitosamente", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "✅ Boleta $numeroSerie generada", Toast.LENGTH_LONG).show()
                     carrito.clear()
                     actualizarCarrito()
                 } else {
